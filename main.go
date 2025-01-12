@@ -9,7 +9,7 @@ import (
 
 func main() {
 	fmt.Println("__Менеджер паролей__")
-	vault := account.NewVault(files.NewJsonDb("data.json"))
+	vault := account.NewVault(files.NewJsonDb("db/data.json"))
 Menu:
 	for {
 
