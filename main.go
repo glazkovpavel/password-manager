@@ -2,28 +2,49 @@ package main
 
 import (
 	"demo/password/account"
+	"demo/password/encrypter"
 	"demo/password/files"
+	"demo/password/output"
 	"fmt"
 	"github.com/fatih/color"
+	"github.com/joho/godotenv"
+	"strings"
 )
+
+var menu = map[string]func(*account.VaultWithDb){
+	"1": createAccount,
+	"2": findAccountByUrl,
+	"3": findAccountByLogin,
+	"4": deleteAccount,
+}
+
+var menuVariants = []string{
+	"1. Создать аккаунт",
+	"2. Найти аккаунт по URL",
+	"3. Найти аккаунт по логину",
+	"4. Удалить аккаунт",
+	"5. Выход",
+	"Выберите вариант",
+}
 
 func main() {
 	fmt.Println("__Менеджер паролей__")
-	vault := account.NewVault(files.NewJsonDb("db/data.json"))
+	env := godotenv.Load()
+
+	if env != nil {
+		output.PrintError("Не удалось найти .env file")
+	}
+
+	vault := account.NewVault(files.NewJsonDb("db/data.vault"), *encrypter.NewEncrypter())
 Menu:
 	for {
 
-		variant := getMenu()
-		switch variant {
-		case 1:
-			createAccount(vault)
-		case 2:
-			findAccount(vault)
-		case 3:
-			deleteAccount(vault)
-		default:
+		variant := promptData(menuVariants...)
+		menuFunc := menu[variant]
+		if menuFunc == nil {
 			break Menu
 		}
+		menuFunc(vault)
 	}
 
 }
@@ -34,33 +55,36 @@ func deleteAccount(vault *account.VaultWithDb) {
 	if isDeleted {
 		color.Green("Удалено")
 	} else {
-		color.Red("Не найдено")
+		output.PrintError("Не найдено")
 	}
 }
 
-func findAccount(vault *account.VaultWithDb) {
+func findAccountByUrl(vault *account.VaultWithDb) {
 	url := promptData("Введите URL для поиска")
-	accounts := vault.FindAccountsByUrl(url)
+	accounts := vault.FindAccounts(url, func(acc account.Account, str string) bool {
+		return strings.Contains(acc.Url, str)
+	})
 
-	if len(accounts) == 0 {
-		color.Red("Аккаунтов не найдено")
+	outputAccountInfo(&accounts)
+}
+
+func findAccountByLogin(vault *account.VaultWithDb) {
+	login := promptData("Введите логин для поиска")
+	accounts := vault.FindAccounts(login, func(acc account.Account, str string) bool {
+		return strings.Contains(acc.Login, str)
+	})
+
+	outputAccountInfo(&accounts)
+}
+
+func outputAccountInfo(accounts *[]account.Account) {
+	if len(*accounts) == 0 {
+		output.PrintError("Аккаунтов не найдено")
 	}
 
-	for _, account := range accounts {
+	for _, account := range *accounts {
 		account.Output()
 	}
-}
-
-func getMenu() int {
-	var variant int
-	fmt.Println("Выберите вариант:")
-	fmt.Println("1. Создать аккаунт")
-	fmt.Println("2. Найти аккаунт")
-	fmt.Println("3. Удалить аккаунт")
-	fmt.Println("4. Выход")
-
-	fmt.Scan(&variant)
-	return variant
 }
 
 func createAccount(vault *account.VaultWithDb) {
@@ -79,18 +103,14 @@ func createAccount(vault *account.VaultWithDb) {
 	//myAccount.Output()
 }
 
-func reverse(arr *[4]int) {
-	for index, value := range *arr {
-		(*arr)[len(arr)-1-index] = value
+func promptData(prompt ...string) string {
+	for i, line := range prompt {
+		if i == len(prompt)-1 {
+			fmt.Printf("%v:", line)
+		} else {
+			fmt.Println(line)
+		}
 	}
-}
-
-func double(num *int) {
-	*num = *num * 2
-}
-
-func promptData(prompt string) string {
-	fmt.Print(prompt + ": ")
 	var input string
 	fmt.Scanln(&input)
 	return input
@@ -117,4 +137,22 @@ func promptData(prompt string) string {
 //myAccount := account{ // порядок не важен
 //	url:   url,
 //	login: login,
+//}
+
+//func reverse(arr *[4]int) {
+//	for index, value := range *arr {
+//		(*arr)[len(arr)-1-index] = value
+//	}
+//}
+//
+//func double(num *int) {
+//	*num = *num * 2
+//}
+
+//func menuCounter() func() { // замыкание
+//	i := 0
+//	return func() {
+//		i++
+//		fmt.Println(i)
+//	}
 //}
